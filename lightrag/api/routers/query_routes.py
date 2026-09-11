@@ -88,6 +88,14 @@ class QueryRequest(BaseModel):
         description="User-provided prompt for the query. If provided, this will be used instead of the default value from prompt template.",
     )
 
+    system_prompt: Optional[str] = Field(
+        default=None,
+        description="Custom system prompt template that replaces the built-in rag_response/naive_rag_response template entirely. "
+        "Must contain a literal '{context_data}' placeholder ('{content_data}' for naive mode) for the retrieved knowledge-base "
+        "context to reach the LLM; '{response_type}' and '{user_prompt}' placeholders are optional. Any other literal '{' or '}' "
+        "in the template must be escaped as '{{' / '}}'.",
+    )
+
     enable_rerank: Optional[bool] = Field(
         default=None,
         description="Enable reranking for retrieved text chunks. If True but no rerank model is configured, a warning will be issued. Default is True.",
@@ -132,7 +140,8 @@ class QueryRequest(BaseModel):
         # Use Pydantic's `.model_dump(exclude_none=True)` to remove None values automatically
         # Exclude API-level parameters that don't belong in QueryParam
         request_data = self.model_dump(
-            exclude_none=True, exclude={"query", "include_chunk_content"}
+            exclude_none=True,
+            exclude={"query", "include_chunk_content", "system_prompt"},
         )
 
         # Ensure `mode` and `stream` are set explicitly
@@ -409,7 +418,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             # Force stream=False for /query endpoint regardless of include_references setting
             param.stream = False
             # Unified approach: always use aquery_llm for both cases
-            result = await rag.aquery_llm(request.query, param=param)
+            result = await rag.aquery_llm(
+                request.query, param=param, system_prompt=request.system_prompt
+            )
 
             # Extract LLM response and references from unified result
             llm_response = result.get("llm_response", {})
@@ -731,7 +742,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             from fastapi.responses import StreamingResponse
 
             # Unified approach: always use aquery_llm for all cases
-            result = await rag.aquery_llm(request.query, param=param)
+            result = await rag.aquery_llm(
+                request.query, param=param, system_prompt=request.system_prompt
+            )
             stream_gen = _build_stream_generator(
                 result=result,
                 include_references=request.include_references,
