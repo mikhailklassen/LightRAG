@@ -156,6 +156,16 @@ class QueryParam:
     containing citation information for the retrieved content.
     """
 
+    bypass_cache: bool = False
+    """If True, the final response LLM call neither reads from nor writes to the
+    query-response cache. Keyword-extraction caching is unaffected.
+    """
+
+    temperature: float | None = None
+    """Sampling temperature for the final response LLM call only. None keeps the
+    configured default. Keyword extraction always uses the configured default.
+    """
+
 
 @dataclass
 class StorageNameSpace(ABC):

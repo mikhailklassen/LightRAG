@@ -111,6 +111,14 @@ async def _ollama_model_if_cache(
     stream = True if kwargs.get("stream") else False
 
     kwargs.pop("max_tokens", None)
+    # Ollama takes sampling parameters inside ``options``; a per-call
+    # temperature overrides the configured one.
+    temperature = kwargs.pop("temperature", None)
+    if temperature is not None:
+        kwargs["options"] = {
+            **(kwargs.get("options") or {}),
+            "temperature": temperature,
+        }
     # Deprecation shims: map legacy boolean flags to response_format only when
     # an explicit response_format was not supplied by the caller.
     if kwargs.get("response_format") is None:

@@ -231,3 +231,36 @@ async def test_gemini_streaming_structured_output_disables_cot(monkeypatch, requ
         chunks.append(chunk)
 
     assert "".join(chunks) == '{"answer":"ok"}'
+
+
+@pytest.mark.offline
+@pytest.mark.asyncio
+async def test_gemini_per_call_temperature_overrides_generation_config(
+    monkeypatch, request
+):
+    gemini_module = _load_gemini_module(monkeypatch, request)
+    captured = {}
+
+    async def _fake_generate_content(**kwargs):
+        captured.update(kwargs)
+        return _make_fake_gemini_response(regular_text="ok")
+
+    fake_client = SimpleNamespace(
+        aio=SimpleNamespace(
+            models=SimpleNamespace(generate_content=_fake_generate_content)
+        )
+    )
+    monkeypatch.setattr(gemini_module, "_get_gemini_client", lambda *args: fake_client)
+
+    configured = {"temperature": 1.0, "top_p": 0.9}
+    await gemini_module.gemini_complete_if_cache(
+        model="gemini-model",
+        prompt="hello",
+        api_key="test-key",
+        generation_config=configured,
+        temperature=0.2,
+    )
+
+    assert captured["config"].kwargs["temperature"] == 0.2
+    assert captured["config"].kwargs["top_p"] == 0.9
+    assert configured["temperature"] == 1.0  # caller's dict is not mutated

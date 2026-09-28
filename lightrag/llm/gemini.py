@@ -297,6 +297,7 @@ async def gemini_complete_if_cache(
     generation_config: dict[str, Any] | None = None,
     timeout: int | None = None,
     image_inputs: list[Any] | None = None,
+    temperature: float | None = None,
     **_: Any,
 ) -> str | AsyncIterator[str]:
     """
@@ -342,6 +343,7 @@ async def gemini_complete_if_cache(
         hashing_kv: Storage interface (for interface parity with other bindings).
         enable_cot: Whether to include Chain of Thought content in the response.
         timeout: Request timeout in seconds (will be converted to milliseconds for Gemini API).
+        temperature: Optional per-call temperature; overrides ``generation_config``.
         **_: Additional keyword arguments (ignored).
 
     Returns:
@@ -386,6 +388,9 @@ async def gemini_complete_if_cache(
         prompt_sections.append(history_block)
     prompt_sections.append(f"[user] {prompt}")
     combined_prompt = "\n".join(prompt_sections)
+
+    if temperature is not None:
+        generation_config = {**(generation_config or {}), "temperature": temperature}
 
     config_obj = _build_generation_config(
         generation_config,

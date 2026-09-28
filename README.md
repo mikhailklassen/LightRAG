@@ -115,6 +115,21 @@ curl -X POST https://<your-service>.onrender.com/query \
   -d '{"query": "What are the top themes in this story?", "mode": "hybrid"}'
 ```
 
+### Fork additions to `/query` and `/query/stream`
+
+- `system_prompt`: replaces the built-in response template outright (it must
+  keep the `{context_data}` placeholder, or `{content_data}` in `naive` mode).
+- `bypass_cache`: when `true`, the response is neither read from nor written to
+  the query cache. Keyword-extraction caching is unaffected.
+- `temperature` (0–2): sampling temperature for the final response only.
+  Keyword extraction keeps the server default.
+
+The query-response cache key covers the system prompt template, the
+conversation history and `temperature`, so a cached answer is never served
+across different prompts or conversations. Upgrading changes every
+query-response cache key, so existing query-response entries stop being hit
+(extraction caches are unaffected).
+
 ## Configuration
 
 The env vars above are the minimum. See [`.env.example`](./.env.example) for the
