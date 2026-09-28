@@ -31,6 +31,7 @@ from lightrag.utils import (
     get_env_value,
     get_llm_cache_identity,
     serialize_llm_cache_identity,
+    _serialize_cache_variant,
     update_chunk_cache_list,
     remove_think_tags,
     pick_by_weighted_polling,
@@ -3791,6 +3792,32 @@ async def extract_entities(
     return chunk_results
 
 
+def _response_cache_variant(
+    sys_prompt_template: str, query_param: QueryParam
+) -> tuple[str, ...]:
+    """Hash inputs for the response cache beyond query text and retrieval params.
+
+    The unformatted system prompt template, the conversation history and the
+    temperature all change what the response LLM sees, so a cached answer must
+    not be served across them.
+    """
+    return (
+        "\n<system_prompt>\n",
+        sys_prompt_template,
+        "\n<conversation_history>\n",
+        _serialize_cache_variant(query_param.conversation_history or []),
+        "\n<temperature>\n",
+        _serialize_cache_variant(query_param.temperature),
+    )
+
+
+def _response_llm_kwargs(query_param: QueryParam) -> dict[str, Any]:
+    """Per-request overrides for the response LLM call (never keyword extraction)."""
+    if query_param.temperature is None:
+        return {}
+    return {"temperature": query_param.temperature}
+
+
 async def kg_query(
     query: str,
     knowledge_graph_inst: BaseGraphStorage,
@@ -3932,10 +3959,15 @@ async def kg_query(
         global_config.get("enable_content_headings", False),
         "\n<llm_identity>\n",
         serialize_llm_cache_identity(llm_cache_identity),
+        *_response_cache_variant(sys_prompt_temp, query_param),
     )
 
-    cached_result = await handle_cache(
-        hashing_kv, args_hash, user_query, query_param.mode, cache_type="query"
+    cached_result = (
+        None
+        if query_param.bypass_cache
+        else await handle_cache(
+            hashing_kv, args_hash, user_query, query_param.mode, cache_type="query"
+        )
     )
 
     if cached_result is not None:
@@ -3951,9 +3983,14 @@ async def kg_query(
             history_messages=query_param.conversation_history,
             enable_cot=True,
             stream=query_param.stream,
+            **_response_llm_kwargs(query_param),
         )
 
-        if hashing_kv and hashing_kv.global_config.get("enable_llm_cache"):
+        if (
+            hashing_kv
+            and hashing_kv.global_config.get("enable_llm_cache")
+            and not query_param.bypass_cache
+        ):
             queryparam_dict = {
                 "mode": query_param.mode,
                 "response_type": query_param.response_type,
@@ -3969,6 +4006,9 @@ async def kg_query(
                 "enable_content_headings": global_config.get(
                     "enable_content_headings", False
                 ),
+                "system_prompt": sys_prompt_temp,
+                "conversation_history": query_param.conversation_history or [],
+                "temperature": query_param.temperature,
             }
             await save_to_cache(
                 hashing_kv,
@@ -5934,9 +5974,14 @@ async def naive_query(
         global_config.get("enable_content_headings", False),
         "\n<llm_identity>\n",
         serialize_llm_cache_identity(llm_cache_identity),
+        *_response_cache_variant(sys_prompt_template, query_param),
     )
-    cached_result = await handle_cache(
-        hashing_kv, args_hash, user_query, query_param.mode, cache_type="query"
+    cached_result = (
+        None
+        if query_param.bypass_cache
+        else await handle_cache(
+            hashing_kv, args_hash, user_query, query_param.mode, cache_type="query"
+        )
     )
     if cached_result is not None:
         cached_response, _ = cached_result  # Extract content, ignore timestamp
@@ -5951,9 +5996,14 @@ async def naive_query(
             history_messages=query_param.conversation_history,
             enable_cot=True,
             stream=query_param.stream,
+            **_response_llm_kwargs(query_param),
         )
 
-        if hashing_kv and hashing_kv.global_config.get("enable_llm_cache"):
+        if (
+            hashing_kv
+            and hashing_kv.global_config.get("enable_llm_cache")
+            and not query_param.bypass_cache
+        ):
             queryparam_dict = {
                 "mode": query_param.mode,
                 "response_type": query_param.response_type,
@@ -5967,6 +6017,9 @@ async def naive_query(
                 "enable_content_headings": global_config.get(
                     "enable_content_headings", False
                 ),
+                "system_prompt": sys_prompt_template,
+                "conversation_history": query_param.conversation_history or [],
+                "temperature": query_param.temperature,
             }
             await save_to_cache(
                 hashing_kv,

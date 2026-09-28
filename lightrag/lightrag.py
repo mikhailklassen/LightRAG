@@ -112,6 +112,7 @@ from lightrag.operate import (
     kg_query,
     naive_query,
     rebuild_knowledge_from_chunks,
+    _response_llm_kwargs,
 )
 from lightrag.utils_pipeline import normalize_document_file_path
 from lightrag.constants import GRAPH_FIELD_SEP
@@ -2403,6 +2404,7 @@ class LightRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                     history_messages=param.conversation_history,
                     enable_cot=True,
                     stream=param.stream,
+                    **_response_llm_kwargs(param),
                 )
                 if type(response) is str:
                     return {

@@ -114,6 +114,28 @@ async def test_ollama_binding_attaches_images_to_user_message():
 
 
 @pytest.mark.asyncio
+async def test_ollama_binding_moves_per_call_temperature_into_options():
+    from lightrag.llm import ollama as ollama_mod
+
+    fake_client = MagicMock()
+    fake_client.chat = AsyncMock(return_value={"message": {"content": "ok"}})
+    fake_client._client = MagicMock()
+    fake_client._client.aclose = AsyncMock()
+
+    with patch.object(ollama_mod.ollama, "AsyncClient", return_value=fake_client):
+        await ollama_mod._ollama_model_if_cache(
+            model="llama",
+            prompt="hello",
+            options={"temperature": 1.0, "num_ctx": 8192},
+            temperature=0.3,
+        )
+
+    _, kwargs = fake_client.chat.call_args
+    assert "temperature" not in kwargs
+    assert kwargs["options"] == {"temperature": 0.3, "num_ctx": 8192}
+
+
+@pytest.mark.asyncio
 async def test_anthropic_binding_inserts_image_content_block():
     from lightrag.llm import anthropic as anthropic_mod
 

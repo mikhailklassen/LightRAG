@@ -101,6 +101,21 @@ class QueryRequest(BaseModel):
         description="Enable reranking for retrieved text chunks. If True but no rerank model is configured, a warning will be issued. Default is True.",
     )
 
+    bypass_cache: Optional[bool] = Field(
+        default=None,
+        description="If True, the final response LLM call neither reads from nor writes to the query-response cache, "
+        "so a fresh answer is always generated and never stored. Keyword-extraction caching is unaffected. Default is False.",
+    )
+
+    temperature: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Sampling temperature for the final response LLM call only; keyword extraction keeps the server default. "
+        "Overrides the configured temperature for this request and is part of the response cache key. "
+        "Leave unset to use the server default.",
+    )
+
     include_references: Optional[bool] = Field(
         default=True,
         description="If True, includes reference list in responses. Affects /query and /query/stream endpoints. /query/data always includes references.",

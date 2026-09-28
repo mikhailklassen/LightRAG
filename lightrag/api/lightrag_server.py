@@ -1491,7 +1491,9 @@ def create_app(args):
             # the deprecation shim for the legacy booleans.
             kwargs["timeout"] = llm_timeout
             if config_cache.openai_llm_options:
-                kwargs.update(config_cache.openai_llm_options)
+                # Configured options are defaults; per-call kwargs (e.g. a
+                # per-request temperature) take precedence.
+                kwargs = {**config_cache.openai_llm_options, **kwargs}
 
             return await openai_complete_if_cache(
                 args.llm_model,
@@ -1525,7 +1527,9 @@ def create_app(args):
             # to azure_openai_complete_if_cache, which handles deprecation shims.
             kwargs["timeout"] = llm_timeout
             if config_cache.openai_llm_options:
-                kwargs.update(config_cache.openai_llm_options)
+                # Configured options are defaults; per-call kwargs (e.g. a
+                # per-request temperature) take precedence.
+                kwargs = {**config_cache.openai_llm_options, **kwargs}
 
             return await azure_openai_complete_if_cache(
                 args.llm_model,
@@ -1841,7 +1845,7 @@ def create_app(args):
                         history_messages = []
                     kwargs["timeout"] = role_timeout
                     if role_provider_options:
-                        kwargs.update(role_provider_options)
+                        kwargs = {**role_provider_options, **kwargs}
                     return await azure_openai_complete_if_cache(
                         role_model,
                         prompt,
@@ -1894,7 +1898,7 @@ def create_app(args):
                     history_messages = []
                 kwargs["timeout"] = role_timeout
                 if role_provider_options:
-                    kwargs.update(role_provider_options)
+                    kwargs = {**role_provider_options, **kwargs}
                 return await openai_complete_if_cache(
                     role_model,
                     prompt,
